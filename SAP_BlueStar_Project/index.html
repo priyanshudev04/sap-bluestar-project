@@ -1,0 +1,962 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>BlueStar Manufacturing — SAP Blueprint</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg: #0a0d14;
+    --surface: #111520;
+    --surface2: #161b2e;
+    --border: rgba(99,140,255,0.12);
+    --border2: rgba(99,140,255,0.25);
+    --blue: #4f7dff;
+    --blue2: #7aa3ff;
+    --cyan: #00e5cc;
+    --gold: #ffb547;
+    --red: #ff6b6b;
+    --green: #4ade80;
+    --text: #e8ecf8;
+    --muted: #7a84a8;
+    --card-glow: 0 0 40px rgba(79,125,255,0.08);
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── NOISE OVERLAY ── */
+  body::before {
+    content: '';
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    opacity: 0.5;
+  }
+
+  /* ── GRID BACKGROUND ── */
+  .grid-bg {
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background-image:
+      linear-gradient(rgba(79,125,255,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(79,125,255,0.04) 1px, transparent 1px);
+    background-size: 48px 48px;
+  }
+
+  /* ── GLOW BLOBS ── */
+  .blob {
+    position: fixed; border-radius: 50%; filter: blur(120px);
+    pointer-events: none; z-index: 0;
+  }
+  .blob-1 { width: 600px; height: 600px; background: rgba(79,125,255,0.07); top: -200px; right: -200px; }
+  .blob-2 { width: 400px; height: 400px; background: rgba(0,229,204,0.05); bottom: 100px; left: -100px; }
+
+  /* ── LAYOUT ── */
+  #app { position: relative; z-index: 1; }
+
+  /* ── TOPBAR ── */
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 20px 40px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(10,13,20,0.8);
+    backdrop-filter: blur(20px);
+    position: sticky; top: 0; z-index: 100;
+  }
+  .topbar-brand { display: flex; align-items: center; gap: 14px; }
+  .brand-icon {
+    width: 36px; height: 36px; border-radius: 8px;
+    background: linear-gradient(135deg, var(--blue), var(--cyan));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+  }
+  .brand-name { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 18px; letter-spacing: -0.3px; }
+  .brand-sub { font-size: 11px; color: var(--muted); font-family: 'DM Mono', monospace; letter-spacing: 1px; text-transform: uppercase; }
+  .topbar-badge {
+    font-family: 'DM Mono', monospace; font-size: 11px;
+    padding: 4px 12px; border-radius: 20px;
+    background: rgba(79,125,255,0.12); border: 1px solid var(--border2);
+    color: var(--blue2);
+  }
+
+  /* ── NAV TABS ── */
+  .nav {
+    display: flex; gap: 4px;
+    padding: 16px 40px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .nav-tab {
+    padding: 10px 20px; border-radius: 8px 8px 0 0;
+    font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 600;
+    color: var(--muted); cursor: pointer; transition: all 0.2s;
+    border: 1px solid transparent; border-bottom: none;
+    background: none; letter-spacing: 0.3px;
+  }
+  .nav-tab:hover { color: var(--text); background: var(--surface); }
+  .nav-tab.active {
+    color: var(--text); background: var(--surface);
+    border-color: var(--border); border-bottom-color: var(--surface);
+    position: relative; top: 1px;
+  }
+
+  /* ── PAGE ── */
+  .page { display: none; padding: 36px 40px; }
+  .page.active { display: block; }
+
+  /* ── SECTION HEADER ── */
+  .section-header { margin-bottom: 28px; }
+  .section-title {
+    font-family: 'Syne', sans-serif; font-weight: 800; font-size: 28px;
+    letter-spacing: -0.5px; margin-bottom: 6px;
+  }
+  .section-title span { color: var(--blue); }
+  .section-sub { color: var(--muted); font-size: 14px; }
+
+  /* ── STAT ROW ── */
+  .stat-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 32px; }
+  .stat-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px 22px;
+    transition: border-color 0.2s, transform 0.2s;
+  }
+  .stat-card:hover { border-color: var(--border2); transform: translateY(-2px); }
+  .stat-label { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--muted); letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 8px; }
+  .stat-value { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 26px; }
+  .stat-value.blue { color: var(--blue2); }
+  .stat-value.cyan { color: var(--cyan); }
+  .stat-value.gold { color: var(--gold); }
+  .stat-value.green { color: var(--green); }
+  .stat-desc { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+  /* ── ORG CHART ── */
+  .org-wrap {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 16px; padding: 32px; overflow-x: auto;
+  }
+  .org-chart { min-width: 900px; }
+  .org-level { display: flex; justify-content: center; gap: 16px; position: relative; }
+  .org-level + .org-level { margin-top: 0; }
+
+  /* Connector lines */
+  .org-connectors { display: flex; justify-content: center; height: 32px; position: relative; }
+  .vert-line { width: 2px; background: var(--border2); margin: 0 auto; height: 100%; }
+  .horiz-group { display: flex; justify-content: center; height: 32px; }
+  .horiz-line { height: 2px; background: var(--border2); flex: 1; margin-top: 15px; }
+  .horiz-line.hidden { background: transparent; }
+  .vert-down { width: 2px; background: var(--border2); height: 100%; }
+
+  /* Org nodes */
+  .org-node {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px 18px; text-align: center;
+    cursor: pointer; transition: all 0.25s; min-width: 130px;
+    position: relative;
+  }
+  .org-node:hover, .org-node.active-node {
+    border-color: var(--blue); box-shadow: 0 0 0 1px var(--blue), var(--card-glow);
+  }
+  .org-node.root-node { border-color: var(--cyan); background: rgba(0,229,204,0.06); }
+  .org-node.root-node:hover { box-shadow: 0 0 0 1px var(--cyan), 0 0 40px rgba(0,229,204,0.1); }
+  .org-node.fi-node { border-color: rgba(255,181,71,0.3); }
+  .org-node.fi-node:hover, .org-node.fi-node.active-node { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold); }
+  .org-node.mm-node { border-color: rgba(79,125,255,0.3); }
+  .org-node.mm-node:hover, .org-node.mm-node.active-node { border-color: var(--blue); box-shadow: 0 0 0 1px var(--blue); }
+  .org-node.sd-node { border-color: rgba(0,229,204,0.3); }
+  .org-node.sd-node:hover, .org-node.sd-node.active-node { border-color: var(--cyan); box-shadow: 0 0 0 1px var(--cyan); }
+
+  .node-id { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+  .node-name { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 13px; }
+  .node-sub { font-size: 11px; color: var(--muted); margin-top: 3px; }
+  .node-badge {
+    display: inline-block; font-size: 9px; font-family: 'DM Mono', monospace;
+    padding: 2px 7px; border-radius: 20px; margin-top: 6px; letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+  .badge-fi { background: rgba(255,181,71,0.15); color: var(--gold); }
+  .badge-mm { background: rgba(79,125,255,0.15); color: var(--blue2); }
+  .badge-sd { background: rgba(0,229,204,0.15); color: var(--cyan); }
+  .badge-root { background: rgba(0,229,204,0.1); color: var(--cyan); }
+
+  /* Info panel */
+  .info-panel {
+    margin-top: 24px; padding: 20px 24px;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 12px; min-height: 80px;
+    transition: all 0.3s;
+  }
+  .info-panel.hidden { display: none; }
+  .info-title { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 16px; margin-bottom: 10px; }
+  .info-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .info-item label { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--muted); display: block; margin-bottom: 3px; letter-spacing: 1px; }
+  .info-item span { font-size: 13px; }
+
+  /* ── MODULE CARDS ── */
+  .module-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+  .module-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; overflow: hidden; cursor: pointer;
+    transition: all 0.25s;
+  }
+  .module-card:hover { transform: translateY(-4px); box-shadow: var(--card-glow); }
+  .module-card.fi .card-header { background: linear-gradient(135deg, rgba(255,181,71,0.15), rgba(255,181,71,0.05)); border-bottom: 1px solid rgba(255,181,71,0.2); }
+  .module-card.mm .card-header { background: linear-gradient(135deg, rgba(79,125,255,0.15), rgba(79,125,255,0.05)); border-bottom: 1px solid rgba(79,125,255,0.2); }
+  .module-card.sd .card-header { background: linear-gradient(135deg, rgba(0,229,204,0.15), rgba(0,229,204,0.05)); border-bottom: 1px solid rgba(0,229,204,0.2); }
+  .card-header { padding: 20px 22px; }
+  .card-module-id { font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 6px; }
+  .card-module-id.fi { color: var(--gold); }
+  .card-module-id.mm { color: var(--blue2); }
+  .card-module-id.sd { color: var(--cyan); }
+  .card-title { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 18px; }
+  .card-body { padding: 18px 22px; }
+  .config-list { list-style: none; }
+  .config-list li {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 8px 0; border-bottom: 1px solid var(--border);
+    font-size: 13px;
+  }
+  .config-list li:last-child { border: none; }
+  .config-list .tcode {
+    font-family: 'DM Mono', monospace; font-size: 10px;
+    padding: 2px 7px; border-radius: 4px; white-space: nowrap; flex-shrink: 0;
+    margin-top: 2px;
+  }
+  .tcode.fi { background: rgba(255,181,71,0.12); color: var(--gold); }
+  .tcode.mm { background: rgba(79,125,255,0.12); color: var(--blue2); }
+  .tcode.sd { background: rgba(0,229,204,0.12); color: var(--cyan); }
+
+  /* ── DATA TABLES ── */
+  .data-section { margin-bottom: 32px; }
+  .data-section-title {
+    font-family: 'Syne', sans-serif; font-weight: 700; font-size: 16px;
+    margin-bottom: 14px; display: flex; align-items: center; gap: 10px;
+  }
+  .data-section-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+  .data-table { width: 100%; border-collapse: collapse; }
+  .data-table th {
+    text-align: left; padding: 10px 14px;
+    font-family: 'DM Mono', monospace; font-size: 10px;
+    letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted);
+    background: var(--surface2); border-bottom: 1px solid var(--border);
+  }
+  .data-table td {
+    padding: 11px 14px; font-size: 13px;
+    border-bottom: 1px solid var(--border);
+  }
+  .data-table tr:hover td { background: rgba(79,125,255,0.04); }
+  .data-table tr:last-child td { border: none; }
+  .table-wrap {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; overflow: hidden; margin-bottom: 24px;
+  }
+  .pill {
+    display: inline-block; padding: 2px 10px; border-radius: 20px;
+    font-family: 'DM Mono', monospace; font-size: 10px; font-weight: 500;
+  }
+  .pill-blue { background: rgba(79,125,255,0.15); color: var(--blue2); }
+  .pill-gold { background: rgba(255,181,71,0.15); color: var(--gold); }
+  .pill-cyan { background: rgba(0,229,204,0.15); color: var(--cyan); }
+  .pill-green { background: rgba(74,222,128,0.15); color: var(--green); }
+
+  /* ── INTEGRATION FLOW ── */
+  .flow-wrap {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 16px; padding: 32px;
+  }
+  .flow-grid { display: grid; grid-template-columns: 1fr; gap: 20px; }
+  .flow-card {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px 24px;
+    display: grid; grid-template-columns: 1fr auto 1fr auto 1fr;
+    align-items: center; gap: 16px;
+    transition: border-color 0.2s;
+  }
+  .flow-card:hover { border-color: var(--border2); }
+  .flow-module {
+    text-align: center; padding: 12px;
+    border-radius: 8px;
+  }
+  .flow-module.fi { background: rgba(255,181,71,0.1); border: 1px solid rgba(255,181,71,0.2); }
+  .flow-module.mm { background: rgba(79,125,255,0.1); border: 1px solid rgba(79,125,255,0.2); }
+  .flow-module.sd { background: rgba(0,229,204,0.1); border: 1px solid rgba(0,229,204,0.2); }
+  .flow-module .mod-id { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 18px; }
+  .flow-module .mod-name { font-size: 10px; color: var(--muted); font-family: 'DM Mono', monospace; }
+  .flow-arrow { font-size: 22px; color: var(--muted); text-align: center; }
+  .flow-desc { font-size: 13px; color: var(--muted); }
+  .flow-desc strong { color: var(--text); display: block; margin-bottom: 4px; font-family: 'Syne', sans-serif; }
+  .flow-trigger { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--blue2); margin-top: 6px; }
+
+  /* ── HERO / OVERVIEW ── */
+  .hero {
+    background: linear-gradient(135deg, rgba(79,125,255,0.08) 0%, rgba(0,229,204,0.04) 100%);
+    border: 1px solid var(--border); border-radius: 16px;
+    padding: 36px 40px; margin-bottom: 28px;
+    display: grid; grid-template-columns: 1fr auto; gap: 32px; align-items: center;
+  }
+  .hero-title { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 36px; letter-spacing: -1px; line-height: 1.1; }
+  .hero-title em { color: var(--blue); font-style: normal; }
+  .hero-sub { color: var(--muted); font-size: 15px; margin-top: 10px; line-height: 1.6; }
+  .hero-meta { display: grid; gap: 12px; text-align: right; }
+  .hero-meta-item label { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--muted); letter-spacing: 1px; display: block; }
+  .hero-meta-item span { font-family: 'Syne', sans-serif; font-weight: 700; }
+
+  /* ── SEARCH BAR ── */
+  .search-bar {
+    display: flex; align-items: center; gap: 12px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 10px 16px; margin-bottom: 24px;
+  }
+  .search-bar input {
+    flex: 1; background: none; border: none; outline: none;
+    color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 14px;
+  }
+  .search-bar input::placeholder { color: var(--muted); }
+  .search-icon { color: var(--muted); font-size: 16px; }
+
+  /* ── ANIMATIONS ── */
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+  .page.active { animation: fadeIn 0.3s ease; }
+
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+  .live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); display: inline-block; animation: pulse 2s infinite; margin-right: 6px; }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 800px) {
+    .topbar, .nav, .page { padding-left: 16px; padding-right: 16px; }
+    .stat-row { grid-template-columns: repeat(2, 1fr); }
+    .module-grid { grid-template-columns: 1fr; }
+    .hero { grid-template-columns: 1fr; }
+    .hero-meta { text-align: left; }
+    .info-grid { grid-template-columns: repeat(2,1fr); }
+    .flow-card { grid-template-columns: 1fr; }
+    .flow-arrow { transform: rotate(90deg); }
+  }
+</style>
+</head>
+<body>
+<div class="grid-bg"></div>
+<div class="blob blob-1"></div>
+<div class="blob blob-2"></div>
+
+<div id="app">
+
+  <!-- TOPBAR -->
+  <header class="topbar">
+    <div class="topbar-brand">
+      <div class="brand-icon">🏭</div>
+      <div>
+        <div class="brand-name">BlueStar Manufacturing</div>
+        <div class="brand-sub">SAP Company Blueprint</div>
+      </div>
+    </div>
+    <div class="topbar-badge"><span class="live-dot"></span>Client 100 · BSMP · FI/MM/SD</div>
+  </header>
+
+  <!-- NAV TABS -->
+  <nav class="nav">
+    <button class="nav-tab active" onclick="showPage('overview')">Overview</button>
+    <button class="nav-tab" onclick="showPage('orgchart')">Org Chart</button>
+    <button class="nav-tab" onclick="showPage('modules')">Modules</button>
+    <button class="nav-tab" onclick="showPage('masterdata')">Master Data</button>
+    <button class="nav-tab" onclick="showPage('integration')">Integration</button>
+  </nav>
+
+  <!-- ══════════════ PAGE: OVERVIEW ══════════════ -->
+  <div id="page-overview" class="page active">
+
+    <div class="hero">
+      <div>
+        <div class="hero-title">SAP Blueprint<br/><em>BlueStar Mfg Pvt. Ltd.</em></div>
+        <div class="hero-sub">A complete SAP organizational design covering Financial Accounting, Materials Management, and Sales & Distribution — built for Indian regulatory compliance with GST and April–March fiscal year.</div>
+      </div>
+      <div class="hero-meta">
+        <div class="hero-meta-item"><label>Company Code</label><span>BSMP</span></div>
+        <div class="hero-meta-item"><label>SAP Client</label><span>100</span></div>
+        <div class="hero-meta-item"><label>Currency</label><span>INR ₹</span></div>
+        <div class="hero-meta-item"><label>Fiscal Year</label><span>Apr–Mar</span></div>
+      </div>
+    </div>
+
+    <div class="stat-row">
+      <div class="stat-card">
+        <div class="stat-label">Modules</div>
+        <div class="stat-value blue">3</div>
+        <div class="stat-desc">FI · MM · SD</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Plants</div>
+        <div class="stat-value cyan">2</div>
+        <div class="stat-desc">BP01 Bhubaneswar · BP02 Cuttack</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">SPRO Config Steps</div>
+        <div class="stat-value gold">35+</div>
+        <div class="stat-desc">Across FI, MM, SD</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">G/L Accounts</div>
+        <div class="stat-value green">8</div>
+        <div class="stat-desc">CAIN Chart of Accounts</div>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr>
+          <th>Parameter</th><th>Value</th><th>Description</th>
+        </tr></thead>
+        <tbody>
+          <tr><td>Company Name</td><td><strong>BlueStar Manufacturing Pvt. Ltd.</strong></td><td>Fictitious Indian manufacturer</td></tr>
+          <tr><td>Industry</td><td>Industrial Equipment</td><td>Motors, drives, control systems</td></tr>
+          <tr><td>Headquarters</td><td>Bhubaneswar, Odisha</td><td>Main plant and HQ</td></tr>
+          <tr><td>SAP Client</td><td><span class="pill pill-blue">100</span></td><td>Global SAP client</td></tr>
+          <tr><td>Company Code</td><td><span class="pill pill-cyan">BSMP</span></td><td>Legal entity code</td></tr>
+          <tr><td>Chart of Accounts</td><td><span class="pill pill-gold">CAIN</span></td><td>India standard CoA</td></tr>
+          <tr><td>Fiscal Year Variant</td><td><span class="pill pill-green">V3</span></td><td>April to March (Indian FY)</td></tr>
+          <tr><td>Currency</td><td>INR</td><td>Indian Rupee</td></tr>
+          <tr><td>Tax Procedure</td><td>TAXIN</td><td>India GST configuration</td></tr>
+          <tr><td>Controlling Area</td><td>BSCA</td><td>Links FI to CO module</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+
+  <!-- ══════════════ PAGE: ORG CHART ══════════════ -->
+  <div id="page-orgchart" class="page">
+    <div class="section-header">
+      <div class="section-title">Organizational <span>Structure</span></div>
+      <div class="section-sub">Click any node to see details. Covers FI, MM, and SD org objects.</div>
+    </div>
+
+    <div class="org-wrap">
+      <div class="org-chart">
+
+        <!-- L0: Client -->
+        <div class="org-level">
+          <div class="org-node root-node" onclick="showNodeInfo('client')" id="node-client">
+            <div class="node-id">CLIENT</div>
+            <div class="node-name">100</div>
+            <div class="node-sub">BlueStar Group</div>
+            <span class="node-badge badge-root">SAP Client</span>
+          </div>
+        </div>
+
+        <!-- Connector -->
+        <div class="org-connectors"><div class="vert-line"></div></div>
+
+        <!-- L1: Company Code -->
+        <div class="org-level">
+          <div class="org-node" onclick="showNodeInfo('ccode')" id="node-ccode"
+               style="border-color:rgba(255,255,255,0.15); min-width:160px;">
+            <div class="node-id">COMPANY CODE</div>
+            <div class="node-name">BSMP</div>
+            <div class="node-sub">BlueStar Mfg Pvt. Ltd.</div>
+            <span class="node-badge" style="background:rgba(255,255,255,0.08);color:#aab">Legal Entity</span>
+          </div>
+        </div>
+
+        <!-- Connector to 3 modules -->
+        <div class="org-connectors"><div class="vert-line"></div></div>
+        <div style="display:flex;justify-content:center;margin-bottom:0;">
+          <div style="display:flex;width:700px;height:2px;margin:0 auto;position:relative;">
+            <div style="flex:1;background:var(--border2);height:2px;margin-top:0;"></div>
+          </div>
+        </div>
+
+        <!-- L2: Three modules side by side -->
+        <div style="display:flex;justify-content:center;gap:0;margin-top:0;">
+          <!-- FI branch -->
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;max-width:300px;">
+            <div style="width:2px;height:30px;background:var(--border2);"></div>
+            <div class="org-node fi-node" onclick="showNodeInfo('fi')" id="node-fi" style="width:180px;">
+              <div class="node-id">MODULE</div>
+              <div class="node-name">FI</div>
+              <div class="node-sub">Financial Accounting</div>
+              <span class="node-badge badge-fi">CAIN · V3 · INR</span>
+            </div>
+            <div style="width:2px;height:24px;background:rgba(255,181,71,0.3);"></div>
+            <div style="display:flex;gap:12px;">
+              <div class="org-node fi-node" onclick="showNodeInfo('ba01')" id="node-ba01" style="min-width:100px;">
+                <div class="node-id">BUSINESS AREA</div>
+                <div class="node-name">BA01</div>
+                <div class="node-sub">Manufacturing</div>
+              </div>
+              <div class="org-node fi-node" onclick="showNodeInfo('ba02')" id="node-ba02" style="min-width:100px;">
+                <div class="node-id">BUSINESS AREA</div>
+                <div class="node-name">BA02</div>
+                <div class="node-sub">After-Sales</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- MM branch -->
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;max-width:300px;">
+            <div style="width:2px;height:30px;background:var(--border2);"></div>
+            <div class="org-node mm-node" onclick="showNodeInfo('mm')" id="node-mm" style="width:180px;">
+              <div class="node-id">MODULE</div>
+              <div class="node-name">MM</div>
+              <div class="node-sub">Materials Management</div>
+              <span class="node-badge badge-mm">BSPO · BP01/BP02</span>
+            </div>
+            <div style="width:2px;height:24px;background:rgba(79,125,255,0.3);"></div>
+            <div style="display:flex;gap:12px;">
+              <div class="org-node mm-node" onclick="showNodeInfo('bp01')" id="node-bp01" style="min-width:100px;">
+                <div class="node-id">PLANT</div>
+                <div class="node-name">BP01</div>
+                <div class="node-sub">Bhubaneswar</div>
+              </div>
+              <div class="org-node mm-node" onclick="showNodeInfo('bp02')" id="node-bp02" style="min-width:100px;">
+                <div class="node-id">PLANT</div>
+                <div class="node-name">BP02</div>
+                <div class="node-sub">Cuttack</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- SD branch -->
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;max-width:300px;">
+            <div style="width:2px;height:30px;background:var(--border2);"></div>
+            <div class="org-node sd-node" onclick="showNodeInfo('sd')" id="node-sd" style="width:180px;">
+              <div class="node-id">MODULE</div>
+              <div class="node-name">SD</div>
+              <div class="node-sub">Sales & Distribution</div>
+              <span class="node-badge badge-sd">BSSO · SP01</span>
+            </div>
+            <div style="width:2px;height:24px;background:rgba(0,229,204,0.3);"></div>
+            <div style="display:flex;gap:12px;">
+              <div class="org-node sd-node" onclick="showNodeInfo('dc01')" id="node-dc01" style="min-width:100px;">
+                <div class="node-id">DIST. CHANNEL</div>
+                <div class="node-name">DC-01</div>
+                <div class="node-sub">Direct Sales</div>
+              </div>
+              <div class="org-node sd-node" onclick="showNodeInfo('dc02')" id="node-dc02" style="min-width:100px;">
+                <div class="node-id">DIST. CHANNEL</div>
+                <div class="node-name">DC-02</div>
+                <div class="node-sub">Dealer Network</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- org-chart -->
+
+      <!-- Info Panel -->
+      <div id="info-panel" class="info-panel hidden">
+        <div class="info-title" id="info-title"></div>
+        <div class="info-grid" id="info-grid"></div>
+      </div>
+
+    </div><!-- org-wrap -->
+  </div>
+
+  <!-- ══════════════ PAGE: MODULES ══════════════ -->
+  <div id="page-modules" class="page">
+    <div class="section-header">
+      <div class="section-title">Module <span>Configuration</span></div>
+      <div class="section-sub">Key SPRO steps and T-Codes for each SAP module</div>
+    </div>
+
+    <div class="module-grid">
+
+      <!-- FI Card -->
+      <div class="module-card fi">
+        <div class="card-header">
+          <div class="card-module-id fi">Financial Accounting</div>
+          <div class="card-title">SAP FI</div>
+        </div>
+        <div class="card-body">
+          <ul class="config-list">
+            <li><span class="tcode fi">OX02</span>Define Company Code BSMP</li>
+            <li><span class="tcode fi">OB62</span>Assign Chart of Accounts CAIN</li>
+            <li><span class="tcode fi">OB29</span>Fiscal Year Variant V3 (Apr–Mar)</li>
+            <li><span class="tcode fi">OBBO</span>Posting Period Variant BSMP</li>
+            <li><span class="tcode fi">OBA7</span>Document Types: SA, KR, KZ, DR, DZ</li>
+            <li><span class="tcode fi">OBYZ</span>Tax Procedure TAXIN (GST)</li>
+            <li><span class="tcode fi">OBYC</span>Auto Account Determination (BSX, GBB)</li>
+            <li><span class="tcode fi">OB45</span>Credit Control Area BSCA</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- MM Card -->
+      <div class="module-card mm">
+        <div class="card-header">
+          <div class="card-module-id mm">Materials Management</div>
+          <div class="card-title">SAP MM</div>
+        </div>
+        <div class="card-body">
+          <ul class="config-list">
+            <li><span class="tcode mm">OX10</span>Define Plants BP01 & BP02</li>
+            <li><span class="tcode mm">OX18</span>Assign Plants to Company Code</li>
+            <li><span class="tcode mm">OX09</span>Storage Locations SL01, SL02, SL03</li>
+            <li><span class="tcode mm">OX08</span>Purchasing Org BSPO (Central)</li>
+            <li><span class="tcode mm">OMS2</span>Material Types ROH / FERT / HALB</li>
+            <li><span class="tcode mm">OMJJ</span>Movement Types 101, 201, 601</li>
+            <li><span class="tcode mm">OMGQ</span>Release Procedure (PO > ₹5 Lakhs)</li>
+            <li><span class="tcode mm">OME4</span>Purchasing Groups PG01, PG02</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- SD Card -->
+      <div class="module-card sd">
+        <div class="card-header">
+          <div class="card-module-id sd">Sales &amp; Distribution</div>
+          <div class="card-title">SAP SD</div>
+        </div>
+        <div class="card-body">
+          <ul class="config-list">
+            <li><span class="tcode sd">OVX5</span>Sales Org BSSO → BSMP</li>
+            <li><span class="tcode sd">OVXI</span>Distribution Channels 01 & 02</li>
+            <li><span class="tcode sd">OVXA</span>Divisions: 10 Equipment, 20 Spares</li>
+            <li><span class="tcode sd">OVXG</span>Sales Area: BSSO/01/10</li>
+            <li><span class="tcode sd">OVXD</span>Shipping Point SP01 → Plant BP01</li>
+            <li><span class="tcode sd">V/08</span>Pricing Procedure ZPRIND</li>
+            <li><span class="tcode sd">OVA8</span>Credit Control — Auto Check</li>
+            <li><span class="tcode sd">NACE</span>Output Types: BA00, RD00, LIEF</li>
+          </ul>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══════════════ PAGE: MASTER DATA ══════════════ -->
+  <div id="page-masterdata" class="page">
+    <div class="section-header">
+      <div class="section-title">Master <span>Data</span></div>
+      <div class="section-sub">G/L Accounts, Materials, Vendors, Customers and Pricing</div>
+    </div>
+
+    <!-- G/L Accounts -->
+    <div class="data-section">
+      <div class="data-section-title" style="color:var(--gold)">🟡 FI — General Ledger Accounts</div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th>G/L Account</th><th>Description</th><th>Type</th><th>Category</th></tr></thead>
+          <tbody>
+            <tr><td><span class="pill pill-gold">100001</span></td><td>Cash Account</td><td>Balance Sheet</td><td>Asset</td></tr>
+            <tr><td><span class="pill pill-gold">113000</span></td><td>Bank — HDFC Current</td><td>Balance Sheet</td><td>Asset</td></tr>
+            <tr><td><span class="pill pill-gold">130000</span></td><td>Accounts Receivable (Recon)</td><td>Balance Sheet</td><td>Asset — Reconciliation</td></tr>
+            <tr><td><span class="pill pill-gold">210000</span></td><td>Accounts Payable (Recon)</td><td>Balance Sheet</td><td>Liability — Reconciliation</td></tr>
+            <tr><td><span class="pill pill-gold">220000</span></td><td>GST Payable</td><td>Balance Sheet</td><td>Liability</td></tr>
+            <tr><td><span class="pill pill-gold">300000</span></td><td>Raw Material Inventory</td><td>Balance Sheet</td><td>Asset — BSX key</td></tr>
+            <tr><td><span class="pill pill-gold">400000</span></td><td>Revenue from Sales</td><td>P&amp;L</td><td>Revenue</td></tr>
+            <tr><td><span class="pill pill-gold">500000</span></td><td>Cost of Goods Sold</td><td>P&amp;L</td><td>Expense — GBB key</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Materials -->
+    <div class="data-section">
+      <div class="data-section-title" style="color:var(--blue2)">🔵 MM — Material Master</div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th>Material</th><th>Description</th><th>Type</th><th>Plant</th><th>Price Control</th></tr></thead>
+          <tbody>
+            <tr><td><span class="pill pill-blue">STL-SHEET-01</span></td><td>Cold Rolled Steel Sheet</td><td>ROH</td><td>BP01 / SL01</td><td>Moving Avg (V)</td></tr>
+            <tr><td><span class="pill pill-blue">COIL-COP-01</span></td><td>Copper Motor Coil</td><td>ROH</td><td>BP01 / SL01</td><td>Moving Avg (V)</td></tr>
+            <tr><td><span class="pill pill-blue">BIM-200</span></td><td>BlueStar Industrial Motor 200kW</td><td>FERT</td><td>BP01 / SL02</td><td>Standard Price (S)</td></tr>
+            <tr><td><span class="pill pill-blue">BIM-500</span></td><td>BlueStar Industrial Motor 500kW</td><td>FERT</td><td>BP01 / SL02</td><td>Standard Price (S)</td></tr>
+            <tr><td><span class="pill pill-blue">SPR-BRNG-01</span></td><td>Bearing Spare Part Kit</td><td>HIBE</td><td>BP02 / SL03</td><td>Moving Avg (V)</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Vendor -->
+    <div class="data-section">
+      <div class="data-section-title" style="color:var(--blue2)">🔵 MM — Vendor Master</div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th>Vendor No.</th><th>Name</th><th>Purch. Org</th><th>Recon A/C</th><th>Payment Terms</th></tr></thead>
+          <tbody>
+            <tr><td><span class="pill pill-blue">V100001</span></td><td>Tata Steel Suppliers Ltd.</td><td>BSPO</td><td>210000</td><td>N030 (Net 30)</td></tr>
+            <tr><td><span class="pill pill-blue">V100002</span></td><td>Hindalco Copper Components</td><td>BSPO</td><td>210000</td><td>N045 (Net 45)</td></tr>
+            <tr><td><span class="pill pill-blue">V100003</span></td><td>SKF Bearings India Pvt. Ltd.</td><td>BSPO</td><td>210000</td><td>N030 (Net 30)</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Customer -->
+    <div class="data-section">
+      <div class="data-section-title" style="color:var(--cyan)">🟢 SD — Customer Master</div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th>Customer No.</th><th>Name</th><th>Sales Area</th><th>Recon A/C</th><th>Credit Limit</th></tr></thead>
+          <tbody>
+            <tr><td><span class="pill pill-cyan">C100001</span></td><td>Odisha Power Transmission Corp.</td><td>BSSO/01/10</td><td>130000</td><td>₹ 25,00,000</td></tr>
+            <tr><td><span class="pill pill-cyan">C100002</span></td><td>NTPC Procurement Division</td><td>BSSO/01/10</td><td>130000</td><td>₹ 50,00,000</td></tr>
+            <tr><td><span class="pill pill-cyan">C100003</span></td><td>BlueStar Dealer — Kolkata</td><td>BSSO/02/10</td><td>130000</td><td>₹ 10,00,000</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="data-section">
+      <div class="data-section-title" style="color:var(--cyan)">🟢 SD — Pricing Conditions (ZPRIND)</div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th>Step</th><th>Condition Type</th><th>Description</th><th>Sample Value</th></tr></thead>
+          <tbody>
+            <tr><td>10</td><td><span class="pill pill-cyan">PR00</span></td><td>Base Price</td><td>BIM-200 → ₹ 85,000/unit</td></tr>
+            <tr><td>20</td><td><span class="pill pill-cyan">K007</span></td><td>Customer Discount %</td><td>Key Accounts → 5%</td></tr>
+            <tr><td>30</td><td><span class="pill pill-cyan">K005</span></td><td>Material Discount</td><td>BIM-500 → ₹ 2,000/unit</td></tr>
+            <tr><td>40</td><td><span class="pill pill-cyan">MWST</span></td><td>Output Tax (GST 18%)</td><td>Auto from TAXIN</td></tr>
+            <tr><td>50</td><td><span class="pill pill-cyan">VPRS</span></td><td>Cost (Statistical)</td><td>Internal cost ref.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ══════════════ PAGE: INTEGRATION ══════════════ -->
+  <div id="page-integration" class="page">
+    <div class="section-header">
+      <div class="section-title">Integration <span>Flows</span></div>
+      <div class="section-sub">How FI, MM, and SD are connected in BlueStar's SAP landscape</div>
+    </div>
+
+    <div class="flow-wrap">
+      <div class="flow-grid">
+
+        <div class="flow-card">
+          <div class="flow-module mm">
+            <div class="mod-id" style="color:var(--blue2)">MM</div>
+            <div class="mod-name">Materials Mgmt</div>
+          </div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-module fi">
+            <div class="mod-id" style="color:var(--gold)">FI</div>
+            <div class="mod-name">Financial Acctg</div>
+          </div>
+          <div style="width:1px;background:var(--border);height:60px;"></div>
+          <div class="flow-desc">
+            <strong>Procure-to-Pay (P2P)</strong>
+            When a Goods Receipt is posted (MIGO, Mvmt 101), SAP automatically creates FI document posting to Stock Account (BSX → GL 300000) and GR/IR Clearing (WRX → GL 191000).
+            <div class="flow-trigger">T-Codes: ME21N → MIGO → MIRO</div>
+          </div>
+        </div>
+
+        <div class="flow-card">
+          <div class="flow-module sd">
+            <div class="mod-id" style="color:var(--cyan)">SD</div>
+            <div class="mod-name">Sales & Distrib.</div>
+          </div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-module fi">
+            <div class="mod-id" style="color:var(--gold)">FI</div>
+            <div class="mod-name">Financial Acctg</div>
+          </div>
+          <div style="width:1px;background:var(--border);height:60px;"></div>
+          <div class="flow-desc">
+            <strong>Order-to-Cash (O2C)</strong>
+            Billing document (VF01) automatically generates FI document: Debit AR (GL 130000), Credit Revenue (GL 400000), Credit GST Payable (GL 220000). Customer payment clears the open item.
+            <div class="flow-trigger">T-Codes: VA01 → VL01N → VF01 → F-28</div>
+          </div>
+        </div>
+
+        <div class="flow-card">
+          <div class="flow-module mm">
+            <div class="mod-id" style="color:var(--blue2)">MM</div>
+            <div class="mod-name">Materials Mgmt</div>
+          </div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-module sd">
+            <div class="mod-id" style="color:var(--cyan)">SD</div>
+            <div class="mod-name">Sales & Distrib.</div>
+          </div>
+          <div style="width:1px;background:var(--border);height:60px;"></div>
+          <div class="flow-desc">
+            <strong>Inventory to Delivery</strong>
+            When outbound delivery is goods-issued (VL02N), Movement Type 601 is triggered in MM — reducing stock from SL02 (Finished Goods). COGS is posted to GL 500000 via GBB account key in OBYC.
+            <div class="flow-trigger">T-Codes: VL01N → VL02N (PGI) → MM stock reduced</div>
+          </div>
+        </div>
+
+        <div class="flow-card">
+          <div class="flow-module sd">
+            <div class="mod-id" style="color:var(--cyan)">SD</div>
+            <div class="mod-name">Sales & Distrib.</div>
+          </div>
+          <div class="flow-arrow">↔</div>
+          <div class="flow-module fi">
+            <div class="mod-id" style="color:var(--gold)">FI</div>
+            <div class="mod-name">Financial Acctg</div>
+          </div>
+          <div style="width:1px;background:var(--border);height:60px;"></div>
+          <div class="flow-desc">
+            <strong>Credit Management</strong>
+            During sales order creation (VA01), SAP checks the customer's credit exposure in FI (Credit Control Area BSCA). If the limit (configured in FD32) is exceeded, the order is blocked. Credit rep reviews via VKM1.
+            <div class="flow-trigger">T-Codes: VA01 (credit check) → VKM1 (release) → FD32 (limits)</div>
+          </div>
+        </div>
+
+      </div><!-- flow-grid -->
+    </div><!-- flow-wrap -->
+  </div>
+
+</div><!-- app -->
+
+<script>
+// ── TAB NAVIGATION ─────────────────────────────────────────────
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  event.target.classList.add('active');
+}
+
+// ── ORG CHART NODE INFO ─────────────────────────────────────────
+const nodeData = {
+  client: {
+    title: 'SAP Client 100 — BlueStar Group',
+    fields: [
+      { label: 'CLIENT ID', value: '100' },
+      { label: 'GROUP NAME', value: 'BlueStar Group' },
+      { label: 'TYPE', value: 'Top-level SAP client' },
+      { label: 'CURRENCY', value: 'INR (Indian Rupee)' },
+      { label: 'LANGUAGE', value: 'EN (English)' },
+      { label: 'COUNTRY', value: 'India (IN)' },
+    ]
+  },
+  ccode: {
+    title: 'Company Code BSMP — BlueStar Manufacturing Pvt. Ltd.',
+    fields: [
+      { label: 'CODE', value: 'BSMP' },
+      { label: 'LEGAL NAME', value: 'BlueStar Manufacturing Pvt. Ltd.' },
+      { label: 'CITY', value: 'Bhubaneswar, Odisha' },
+      { label: 'CHART OF ACCOUNTS', value: 'CAIN (India Standard)' },
+      { label: 'FISCAL YEAR', value: 'V3 — April to March' },
+      { label: 'CONTROLLING AREA', value: 'BSCA' },
+    ]
+  },
+  fi: {
+    title: 'FI — Financial Accounting Module',
+    fields: [
+      { label: 'MODULE', value: 'FI (Financial Accounting)' },
+      { label: 'CHART OF ACCOUNTS', value: 'CAIN' },
+      { label: 'FISCAL YEAR VARIANT', value: 'V3 (Apr–Mar, 12+4 periods)' },
+      { label: 'TAX PROCEDURE', value: 'TAXIN (India GST)' },
+      { label: 'POSTING PERIOD', value: 'BSMP variant' },
+      { label: 'CREDIT CONTROL AREA', value: 'BSCA' },
+    ]
+  },
+  mm: {
+    title: 'MM — Materials Management Module',
+    fields: [
+      { label: 'MODULE', value: 'MM (Materials Management)' },
+      { label: 'PURCHASING ORG', value: 'BSPO (Central)' },
+      { label: 'PLANTS', value: 'BP01 (Bhubaneswar), BP02 (Cuttack)' },
+      { label: 'MATERIAL TYPES', value: 'ROH, FERT, HALB, HIBE' },
+      { label: 'PURCHASING GROUPS', value: 'PG01 (Raw Mat.), PG02 (Spares)' },
+      { label: 'VALUATION', value: 'Plant-level (Moving Avg / Std)' },
+    ]
+  },
+  sd: {
+    title: 'SD — Sales & Distribution Module',
+    fields: [
+      { label: 'MODULE', value: 'SD (Sales & Distribution)' },
+      { label: 'SALES ORG', value: 'BSSO' },
+      { label: 'DISTRIBUTION CHANNELS', value: '01 Direct, 02 Dealer' },
+      { label: 'DIVISIONS', value: '10 Equipment, 20 Spares' },
+      { label: 'SHIPPING POINT', value: 'SP01 (Plant BP01)' },
+      { label: 'PRICING PROCEDURE', value: 'ZPRIND' },
+    ]
+  },
+  bp01: {
+    title: 'Plant BP01 — Bhubaneswar Main Plant',
+    fields: [
+      { label: 'PLANT', value: 'BP01' },
+      { label: 'LOCATION', value: 'Bhubaneswar, Odisha' },
+      { label: 'TYPE', value: 'Main Manufacturing Plant' },
+      { label: 'STORAGE LOCS', value: 'SL01 (Raw Mat.), SL02 (FG)' },
+      { label: 'PURCHASING ORG', value: 'BSPO' },
+      { label: 'SHIPPING POINT', value: 'SP01 assigned here' },
+    ]
+  },
+  bp02: {
+    title: 'Plant BP02 — Cuttack Warehouse',
+    fields: [
+      { label: 'PLANT', value: 'BP02' },
+      { label: 'LOCATION', value: 'Cuttack, Odisha' },
+      { label: 'TYPE', value: 'Secondary Warehouse Plant' },
+      { label: 'STORAGE LOCS', value: 'SL03 (Warehouse Store)' },
+      { label: 'PURCHASING ORG', value: 'BSPO' },
+      { label: 'PURPOSE', value: 'Spare parts & overflow stock' },
+    ]
+  },
+  ba01: {
+    title: 'Business Area BA01 — Manufacturing',
+    fields: [
+      { label: 'BUSINESS AREA', value: 'BA01' },
+      { label: 'DESCRIPTION', value: 'Industrial Equipment Manufacturing' },
+      { label: 'MODULE', value: 'FI' },
+      { label: 'PURPOSE', value: 'Segment P&L reporting' },
+      { label: 'COST CENTRES', value: 'CC-MFG-01, CC-MFG-02' },
+      { label: 'GL ACCOUNTS', value: 'Production cost accounts' },
+    ]
+  },
+  ba02: {
+    title: 'Business Area BA02 — After-Sales Services',
+    fields: [
+      { label: 'BUSINESS AREA', value: 'BA02' },
+      { label: 'DESCRIPTION', value: 'After-Sales & Service Division' },
+      { label: 'MODULE', value: 'FI' },
+      { label: 'PURPOSE', value: 'Service revenue tracking' },
+      { label: 'DIVISION', value: '20 (Spare Parts)' },
+      { label: 'GL ACCOUNTS', value: 'Service revenue accounts' },
+    ]
+  },
+  dc01: {
+    title: 'Distribution Channel 01 — Direct Sales',
+    fields: [
+      { label: 'CHANNEL', value: '01' },
+      { label: 'DESCRIPTION', value: 'Direct Sales to End Customers' },
+      { label: 'SALES ORG', value: 'BSSO' },
+      { label: 'CUSTOMER TYPES', value: 'Large enterprises, PSUs' },
+      { label: 'PRICING', value: 'ZPRIND with full discounts' },
+      { label: 'SALES GROUP', value: 'SG01 — Key Accounts' },
+    ]
+  },
+  dc02: {
+    title: 'Distribution Channel 02 — Dealer Network',
+    fields: [
+      { label: 'CHANNEL', value: '02' },
+      { label: 'DESCRIPTION', value: 'Dealer & Channel Partner Sales' },
+      { label: 'SALES ORG', value: 'BSSO' },
+      { label: 'CUSTOMER TYPES', value: 'Regional dealers, distributors' },
+      { label: 'PRICING', value: 'ZPRIND — dealer margin pricing' },
+      { label: 'SALES GROUP', value: 'SG02 — SME & Dealer Accounts' },
+    ]
+  }
+};
+
+function showNodeInfo(nodeId) {
+  // remove active from all nodes
+  document.querySelectorAll('.org-node').forEach(n => n.classList.remove('active-node'));
+  document.getElementById('node-' + nodeId).classList.add('active-node');
+
+  const data = nodeData[nodeId];
+  if (!data) return;
+
+  const panel = document.getElementById('info-panel');
+  document.getElementById('info-title').textContent = data.title;
+  document.getElementById('info-grid').innerHTML = data.fields.map(f =>
+    `<div class="info-item"><label>${f.label}</label><span>${f.value}</span></div>`
+  ).join('');
+  panel.classList.remove('hidden');
+}
+</script>
+</body>
+</html>
